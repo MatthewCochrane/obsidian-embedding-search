@@ -1,11 +1,11 @@
 {
-	"id": "obsidian-sample-plugin",
-	"name": "Sample Plugin",
-	"version": "1.0.0",
+	"id": "obsidian-embedding-search",
+	"name": "Embedding Search",
+	"version": "0.1.0",
 	"minAppVersion": "0.15.0",
-	"description": "This is a sample plugin for Obsidian. This plugin demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"description": "Search your notes using embedding search and Llama index.",
+	"author": "Matthew Cochrane",
+	"authorUrl": "https://github.com/MatthewCochrane",
+	"fundingUrl": "https://github.com/MatthewCochrane",
 	"isDesktopOnly": false
 }
