@@ -1,6 +1,6 @@
 import {EmbeddingHelper} from "../embeddingHelper";
 import {CreateEmbeddingResponse, OpenAIApi} from "openai";
-import {TFile} from "obsidian";
+import {App, TFile} from "obsidian";
 import {AxiosResponse} from "axios";
 
 
@@ -36,9 +36,51 @@ describe('EmbeddingHelper', () => {
         });
     });
 
+    describe('splitStringIntoMaxTokens', () => {
+        test('splits a string into parts with no more than maxTokens tokens', () => {
+            const input = 'This is an example sentence to try encoding out on!';
+            const maxTokens = 5;
+            const result = EmbeddingHelper.splitStringIntoMaxTokens(input, maxTokens);
+            expect(result.length).toBeGreaterThan(0);
+            expect(result.join('')).toEqual(input);
+        });
+
+        test('splits a string with one token into one part', () => {
+            const input = 'hello';
+            const maxTokens = 5;
+            const result = EmbeddingHelper.splitStringIntoMaxTokens(input, maxTokens);
+            expect(result.length).toBe(1);
+            expect(result[0]).toEqual(input);
+        });
+
+        test('handles empty input string', () => {
+            const input = '';
+            const maxTokens = 5;
+            const result = EmbeddingHelper.splitStringIntoMaxTokens(input, maxTokens);
+            expect(result.length).toBe(0);
+        });
+
+        test('handles maxTokens as 1', () => {
+            const input = 'Hello, world!';
+            const maxTokens = 1;
+            const result = EmbeddingHelper.splitStringIntoMaxTokens(input, maxTokens);
+            expect(result.length).toBeGreaterThan(0);
+            expect(result.join('')).toEqual(input);
+        });
+
+        test('handles maxTokens equal to or greater than the number of tokens in the input string', () => {
+            const input = 'This is another test case!';
+            const maxTokens = 50;
+            const result = EmbeddingHelper.splitStringIntoMaxTokens(input, maxTokens);
+            expect(result.length).toBe(1);
+            expect(result[0]).toEqual(input);
+        });
+    });
+
     describe('searchWithEmbeddings', () => {
         let embeddingHelper: EmbeddingHelper;
         let openai: OpenAIApi;
+        let app: App;
 
         const noteEmbeddings = {
             'path/to/note1': {notePath: 'path/to/note1', embeddings: [0.1, 0.2, 0.3]},
@@ -49,14 +91,15 @@ describe('EmbeddingHelper', () => {
 
         beforeEach(() => {
             openai = new OpenAIApi();
+            app = new App();
             embeddingHelper = new EmbeddingHelper((path: string) => {
                 const file = new TFile();
                 file.path = path;
                 const pathParts = path.split("/");
-                file.basename = pathParts[pathParts.length-1];
+                file.basename = pathParts[pathParts.length - 1];
                 file.extension = '';
                 return file;
-            }, 'text-embedding-ada-002');
+            }, app, 'text-embedding-ada-002');
             embeddingHelper.openai = openai;
 
             const mockEmbeddingResponse: AxiosResponse<CreateEmbeddingResponse> = {

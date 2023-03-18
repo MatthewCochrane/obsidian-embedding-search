@@ -27,6 +27,7 @@
         "typescript": "4.7.4"
     },
     "dependencies": {
+        "gptoken": "^0.1.0",
         "openai": "^3.2.1"
     },
     "jest": {

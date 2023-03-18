@@ -1,5 +1,6 @@
-import {TFile} from "obsidian";
+import {App, TFile} from "obsidian";
 import {OpenAIApi} from "openai";
+import {decode, encode} from "gptoken";
 
 export interface EmbeddingSearchResult {
     note: TFile,
@@ -15,6 +16,7 @@ export class EmbeddingHelper {
     private _openai: OpenAIApi;
 
     constructor(private readonly getNoteFromPath: (path: string) => TFile,
+                private readonly app: App,
                 private readonly model: string = 'text-embedding-ada-002') {
         // Only exists to set the private members
     }
@@ -71,5 +73,35 @@ export class EmbeddingHelper {
         return similarities.sort(
             (a, b) => b.similarity - a.similarity
         ).slice(0, limit);
+    }
+
+    async updateEmbedding(noteEmbeddings: { [key: string]: NoteEmbedding },
+                          note: TFile) {
+        if (note.extension !== 'md') return;
+        // TODO: Remove this
+        if (Object.keys(noteEmbeddings).length > 5) return;
+
+        const noteContent = await this.app.vault.read(note);
+        const embeddingsResponse = await this._openai.createEmbedding({
+            model: this.model,
+            input: [noteContent],
+        });
+
+        noteEmbeddings[note.path] = {
+            notePath: note.path,
+            embeddings: embeddingsResponse.data.data[0].embedding,
+        };
+    }
+
+    static splitStringIntoMaxTokens(input: string, maxTokens: number): string[] {
+        const encodedInput = encode(input);
+        const chunks = [];
+
+        for (let i = 0; i < encodedInput.length; i += maxTokens) {
+            const chunk = encodedInput.slice(i, i + maxTokens);
+            chunks.push(chunk);
+        }
+
+        return chunks.map(decode);
     }
 }
