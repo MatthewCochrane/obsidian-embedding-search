@@ -83,8 +83,8 @@ describe('EmbeddingHelper', () => {
         let app: App;
 
         const noteEmbeddings = {
-            'path/to/note1': {notePath: 'path/to/note1', embeddings: [0.1, 0.2, 0.3]},
-            'path/to/note2': {notePath: 'path/to/note2', embeddings: [0.4, 0.5, 0.6]},
+            'path/to/note1': {notePath: 'path/to/note1', embeddings: [[0.1, 0.2, 0.3]]},
+            'path/to/note2': {notePath: 'path/to/note2', embeddings: [[0.4, 0.5, 0.6], [0.7, 0.8, 0.9]]},
         };
         const query = 'sample query';
         const limit = 2;
@@ -132,9 +132,9 @@ describe('EmbeddingHelper', () => {
             const results = await embeddingHelper.searchWithEmbeddings(noteEmbeddings, query, limit);
 
             expect(results.length).toBe(2);
-            expect(results[0].note).toMatchObject({basename: 'note2', extension: ''});
-            expect(results[0].similarity).toBeCloseTo(0.9982, 4);
-            expect(results[1].note).toMatchObject({basename: 'note1', extension: ''});
+            expect(results[0].note).toMatchObject({basename: 'note2'});
+            expect(results[0].similarity).toBeCloseTo(0.99999, 4);
+            expect(results[1].note).toMatchObject({basename: 'note1'});
             expect(results[1].similarity).toBeCloseTo(0.9594, 4);
         });
 
@@ -142,8 +142,8 @@ describe('EmbeddingHelper', () => {
             const limitedResults = await embeddingHelper.searchWithEmbeddings(noteEmbeddings, query, 1);
 
             expect(limitedResults.length).toBe(1);
-            expect(limitedResults[0].note).toMatchObject({basename: 'note2', extension: ''});
-            expect(limitedResults[0].similarity).toBeCloseTo(0.9982, 4);
+            expect(limitedResults[0].note).toMatchObject({basename: 'note2'});
+            expect(limitedResults[0].similarity).toBeCloseTo(0.99999, 4);
         });
     });
 

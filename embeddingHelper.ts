@@ -9,7 +9,7 @@ export interface EmbeddingSearchResult {
 
 export interface NoteEmbedding {
     notePath: string;
-    embeddings: number[];
+    embeddings: number[][];
 }
 
 export class EmbeddingHelper {
@@ -17,7 +17,8 @@ export class EmbeddingHelper {
 
     constructor(private readonly getNoteFromPath: (path: string) => TFile,
                 private readonly app: App,
-                private readonly model: string = 'text-embedding-ada-002') {
+                private readonly model: string = 'text-embedding-ada-002',
+                private readonly maxTokens: number = 8191) {
         // Only exists to set the private members
     }
 
@@ -61,13 +62,16 @@ export class EmbeddingHelper {
         });
 
         // Calculate the similarity between the query and note embeddings
-        const similarities = Object.values(noteEmbeddings).map(({notePath, embeddings}) => ({
-            note: this.getNoteFromPath(notePath),
-            similarity: EmbeddingHelper.cosineSimilarity(
-                queryEmbedding.data.data[0].embedding,
-                embeddings
-            ),
-        }));
+        const similarities = Object.values(noteEmbeddings).map(({notePath, embeddings}) =>
+            // Always use the max similarity found in each file.
+            embeddings.map(embedding => ({
+                note: this.getNoteFromPath(notePath),
+                similarity: EmbeddingHelper.cosineSimilarity(
+                    queryEmbedding.data.data[0].embedding,
+                    embedding
+                ),
+            })).reduce((acc, cur) => (cur.similarity > acc.similarity) ? cur : acc)
+        );
 
         // Sort the results by similarity
         return similarities.sort(
@@ -82,14 +86,16 @@ export class EmbeddingHelper {
         if (Object.keys(noteEmbeddings).length > 5) return;
 
         const noteContent = await this.app.vault.read(note);
+        // Reducing maxTokens by a bit just to 'be safe'
+        const noteParts = EmbeddingHelper.splitStringIntoMaxTokens(noteContent, this.maxTokens - 100)
         const embeddingsResponse = await this._openai.createEmbedding({
             model: this.model,
-            input: [noteContent],
+            input: noteParts,
         });
 
         noteEmbeddings[note.path] = {
             notePath: note.path,
-            embeddings: embeddingsResponse.data.data[0].embedding,
+            embeddings: embeddingsResponse.data.data.map(data => data.embedding),
         };
     }
 
