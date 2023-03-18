@@ -1,137 +1,118 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import {App, Plugin, PluginManifest, TFile} from 'obsidian';
+import {EmbeddingSearchModal} from "./embeddingSearchModal";
+import {EmbeddingHelper, NoteEmbedding} from "./embeddingHelper";
+import {EmbeddingSearchSettingTab} from "./embeddingSearchSettingTab";
 
-// Remember to rename these classes and interfaces!
+const {Configuration, OpenAIApi} = require("openai");
 
-interface MyPluginSettings {
-	mySetting: string;
+interface EmbeddingSearchPluginSettings {
+    openApiKey: string;
+    noteEmbeddings: { [key: string]: NoteEmbedding };
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
-}
+const DEFAULT_SETTINGS: Partial<EmbeddingSearchPluginSettings> = {
+    openApiKey: "",
+    noteEmbeddings: {}
+};
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
 
-	async onload() {
-		await this.loadSettings();
+export default class EmbeddingSearchPlugin extends Plugin {
+    private readonly embeddingsHelper: EmbeddingHelper;
+    private settings: EmbeddingSearchPluginSettings
 
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
+    public getOpenApiKey() {
+        if (this.settings.openApiKey) {
+            return "<KEY_SAVED>";
+        }
+        return "";
+    }
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
+    public setOpenApiKey(openApiKey: string) {
+        this.settings.openApiKey = openApiKey;
+        // Set up the OpenAI API key
+        const configuration = new Configuration({
+            apiKey: openApiKey,
+        });
+        this.embeddingsHelper.openai = new OpenAIApi(configuration);
+    }
 
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
 
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-			}
-		});
+    constructor(app: App, manifest: PluginManifest) {
+        super(app, manifest);
+        const getNoteFromPath = (notePath: string) => this.app.metadataCache.getFirstLinkpathDest(
+            notePath,
+            ''
+        ) as TFile;
+        this.embeddingsHelper = new EmbeddingHelper(getNoteFromPath.bind(this), app);
+    }
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+    async onload() {
+        // Load existing embeddings
+        await this.loadSettings();
+        this.setOpenApiKey(this.settings.openApiKey);
 
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
+        // Add commands and event handlers
+        this.addCommand({
+            id: 'embedding-search',
+            name: 'Embedding Search',
+            callback: () => this.embeddingSearch(),
+        });
 
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-	}
+        this.addSettingTab(new EmbeddingSearchSettingTab(this.app, this));
 
-	onunload() {
+        // These instanceof checks make sense.  We only want files, not folders.
+        // TAbstractFile can be a file or a folder.
+        // this.registerEvent(
+        // 	this.app.vault.on('create', (file) => {
+        // 		if (file instanceof TFile) this.updateEmbedding(file);
+        // 	})
+        // );
+        //
+        this.registerEvent(
+            this.app.vault.on('modify', (file) => {
+                if (file instanceof TFile) this.updateEmbedding(file);
+            })
+        );
+        //
+        // this.registerEvent(
+        // 	this.app.vault.on('delete', (file) => {
+        // 		if (file instanceof TFile) this.removeEmbedding(file);
+        // 	})
+        // );
 
-	}
+    }
 
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-	}
+    async onunload() {
+        await this.saveSettings();
+    }
 
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
-}
+    async loadSettings() {
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
+    async saveSettings() {
+        await this.saveData(this.settings);
+    }
 
-	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
+    async updateEmbedding(note: TFile) {
+        await this.embeddingsHelper.updateEmbedding(this.settings.noteEmbeddings, note);
+        await this.saveSettings();
+    }
 
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
-	}
-}
+    async removeEmbedding(note: TFile) {
+        if (note.path in this.settings.noteEmbeddings) {
+            delete this.settings.noteEmbeddings[note.path];
+            await this.saveSettings();
+        }
+    }
 
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
-
-	constructor(app: App, plugin: MyPlugin) {
-		super(app, plugin);
-		this.plugin = plugin;
-	}
-
-	display(): void {
-		const {containerEl} = this;
-
-		containerEl.empty();
-
-		containerEl.createEl('h2', {text: 'Settings for my awesome plugin.'});
-
-		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					console.log('Secret: ' + value);
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
-	}
+    async embeddingSearch() {
+        const embeddingSearchModal = new EmbeddingSearchModal(
+            this.app,
+            this.embeddingsHelper.searchWithEmbeddings.bind(
+                this.embeddingsHelper, this.settings.noteEmbeddings
+            )
+        );
+        embeddingSearchModal.open();
+    }
 }
