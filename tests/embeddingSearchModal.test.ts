@@ -40,7 +40,7 @@ describe('EmbeddingSearchModal', () => {
 
         await modal.onChooseSuggestion(item, event);
 
-        expect(appMock.workspace.getLeaf).toHaveBeenCalledWith(true);
+        expect(appMock.workspace.getLeaf).toHaveBeenCalledWith(false);
         expect(appMock.workspace.getLeaf().openFile).toHaveBeenCalledWith(item.note);
     });
 

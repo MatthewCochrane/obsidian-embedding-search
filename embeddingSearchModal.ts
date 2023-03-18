@@ -35,7 +35,7 @@ export class EmbeddingSearchModal extends SuggestModal<{ note: TFile; similarity
 	}
 
 	async onChooseSuggestion(item: { note: TFile; similarity: number }, _evt: MouseEvent | KeyboardEvent): Promise<void> {
-		await this.app.workspace.getLeaf(true).openFile(item.note);
+		await this.app.workspace.getLeaf(false).openFile(item.note);
 	}
 
 	async getSuggestions(query: string): Promise<{ note: TFile; similarity: number }[]> {
