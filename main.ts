@@ -47,6 +47,8 @@ export default class EmbeddingSearchPlugin extends Plugin {
     }
 
     async onload() {
+        let pluginLoaded = false;
+
         // Load existing embeddings
         await this.loadSettings();
         this.setOpenApiKey(this.settings.openApiKey);
@@ -62,24 +64,27 @@ export default class EmbeddingSearchPlugin extends Plugin {
 
         // These instanceof checks make sense.  We only want files, not folders.
         // TAbstractFile can be a file or a folder.
-        // this.registerEvent(
-        // 	this.app.vault.on('create', (file) => {
-        // 		if (file instanceof TFile) this.updateEmbedding(file);
-        // 	})
-        // );
-        //
         this.registerEvent(
-            this.app.vault.on('modify', (file) => {
-                if (file instanceof TFile) this.updateEmbedding(file);
+            this.app.vault.on('create', (file) => {
+                if (pluginLoaded && file instanceof TFile) this.updateEmbedding(file);
             })
         );
-        //
-        // this.registerEvent(
-        // 	this.app.vault.on('delete', (file) => {
-        // 		if (file instanceof TFile) this.removeEmbedding(file);
-        // 	})
-        // );
 
+        this.registerEvent(
+            this.app.vault.on('modify', (file) => {
+                if (pluginLoaded && file instanceof TFile) this.updateEmbedding(file);
+            })
+        );
+
+        this.registerEvent(
+            this.app.vault.on('delete', (file) => {
+                if (pluginLoaded && file instanceof TFile) this.removeEmbedding(file);
+            })
+        );
+
+        this.app.workspace.onLayoutReady(() => {
+            pluginLoaded = true;
+        });
     }
 
     async onunload() {
