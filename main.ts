@@ -36,6 +36,14 @@ export default class EmbeddingSearchPlugin extends Plugin {
         this.embeddingsHelper.openai = new OpenAIApi(configuration);
     }
 
+    /**
+     * Returns an array of all indexed note file paths.
+     *
+     * @returns {string[]} An array of note file paths.
+     */
+    public getIndexedFiles() {
+        return Object.values(this.settings.noteEmbeddings).map(noteEmbedding => noteEmbedding.notePath);
+    }
 
     constructor(app: App, manifest: PluginManifest) {
         super(app, manifest);
@@ -99,9 +107,11 @@ export default class EmbeddingSearchPlugin extends Plugin {
         await this.saveData(this.settings);
     }
 
-    async updateEmbedding(note: TFile) {
+    async updateEmbedding(note: TFile, save: boolean = true) {
         await this.embeddingsHelper.updateEmbedding(this.settings.noteEmbeddings, note);
-        await this.saveSettings();
+        if (save) {
+            await this.saveSettings();
+        }
     }
 
     async removeEmbedding(note: TFile) {

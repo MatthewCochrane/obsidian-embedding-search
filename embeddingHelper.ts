@@ -55,6 +55,8 @@ export class EmbeddingHelper {
      */
     async searchWithEmbeddings(noteEmbeddings: { [key: string]: NoteEmbedding },
                                query: string, limit: number): Promise<EmbeddingSearchResult[]> {
+        if (query.trim() == "") return [];
+
         // Convert the query to an embedding
         const queryEmbedding = await this._openai.createEmbedding({
             model: this.model,
@@ -82,10 +84,8 @@ export class EmbeddingHelper {
     async updateEmbedding(noteEmbeddings: { [key: string]: NoteEmbedding },
                           note: TFile) {
         if (note.extension !== 'md') return;
-        // TODO: Remove this
-        if (Object.keys(noteEmbeddings).length > 5) return;
 
-        const noteContent = await this.app.vault.read(note);
+        const noteContent = note.path + "\n" + await this.app.vault.read(note);
         // Reducing maxTokens by a bit just to 'be safe'
         const noteParts = EmbeddingHelper.splitStringIntoMaxTokens(noteContent, this.maxTokens - 100)
         const embeddingsResponse = await this._openai.createEmbedding({
