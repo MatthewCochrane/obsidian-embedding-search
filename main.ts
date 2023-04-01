@@ -1,5 +1,5 @@
 import {App, Plugin, PluginManifest, TFile} from 'obsidian';
-import {EmbeddingSearchModal} from "./embeddingSearchModal";
+import {asyncDebounce, EmbeddingSearchModal} from "./embeddingSearchModal";
 import {EmbeddingHelper, NoteEmbedding} from "./embeddingHelper";
 import {EmbeddingSearchSettingTab} from "./embeddingSearchSettingTab";
 
@@ -18,7 +18,8 @@ const DEFAULT_SETTINGS: Partial<EmbeddingSearchPluginSettings> = {
 
 export default class EmbeddingSearchPlugin extends Plugin {
     private readonly embeddingsHelper: EmbeddingHelper;
-    private settings: EmbeddingSearchPluginSettings
+    private settings: EmbeddingSearchPluginSettings;
+    private debouncedFileUpdates: Map<string, (...args: any[]) => Promise<void>>;
 
     public getOpenApiKey() {
         if (this.settings.openApiKey) {
@@ -52,7 +53,10 @@ export default class EmbeddingSearchPlugin extends Plugin {
             ''
         ) as TFile;
         this.embeddingsHelper = new EmbeddingHelper(getNoteFromPath.bind(this), app);
+        this.debouncedFileUpdates = new Map();
     }
+
+    private readonly UPDATE_TIMEOUT_MS = 20000;
 
     async onload() {
         let pluginLoaded = false;
@@ -80,7 +84,15 @@ export default class EmbeddingSearchPlugin extends Plugin {
 
         this.registerEvent(
             this.app.vault.on('modify', (file) => {
-                if (pluginLoaded && file instanceof TFile) this.updateEmbedding(file);
+                if (!pluginLoaded || !(file instanceof TFile)) return;
+                if (!this.debouncedFileUpdates.has(file.path)) {
+                    this.debouncedFileUpdates.set(
+                        file.path,
+                        asyncDebounce(this.updateEmbedding.bind(this, file), this.UPDATE_TIMEOUT_MS)
+                    );
+                }
+                // Note we do not await it as we don't want to block.
+                this.debouncedFileUpdates.get(file.path)?.();
             })
         );
 

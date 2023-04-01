@@ -1,6 +1,21 @@
 import {App, SuggestModal, TFile} from "obsidian";
 
-function asyncDebounce<T extends unknown[], V>(cb: (...args: [...T]) => Promise<V>, timeout: number): (...args: [...T]) => Promise<V> {
+
+/**
+ * Returns a function that debounces an asynchronous function call. The debounced function delays invoking
+ * the provided async function until after `timeout` milliseconds have elapsed since the last time the
+ * debounced function was called. If the debounced function is called again before `timeout` milliseconds
+ * have elapsed, the timer is reset.
+ *
+ * @template T - An array of arguments that will be passed to the provided async function.
+ * @template V - The return type of the provided async function.
+ *
+ * @param {(...args: [...T]) => Promise<V>} cb - The async function to debounce.
+ * @param {number} timeout - The number of milliseconds to wait before invoking the async function.
+ *
+ * @returns {(...args: [...T]) => Promise<V>} - The debounced function.
+ */
+export function asyncDebounce<T extends unknown[], V>(cb: (...args: [...T]) => Promise<V>, timeout: number): (...args: [...T]) => Promise<V> {
 	let timer: number | null = null;
 	return async (...args: [...T]): Promise<V> => {
 		if (timer) {
@@ -43,6 +58,6 @@ export class EmbeddingSearchModal extends SuggestModal<{ note: TFile; similarity
 	}
 
 	renderSuggestion(value: { note: TFile; similarity: number }, el: HTMLElement) {
-		el.createEl('div', { text: value.note.basename + " (similarity: " + value.similarity.toFixed(4) + ")" });
+		el.createEl('div', { text: value?.note?.basename + " (similarity: " + value?.similarity?.toFixed(4) + ")" });
 	}
 }
