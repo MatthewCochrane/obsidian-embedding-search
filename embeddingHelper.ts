@@ -110,4 +110,19 @@ export class EmbeddingHelper {
 
         return chunks.map(decode);
     }
+
+    async getMeaningInContext(fullText: string, selection: string) : Promise<string> {
+        const chatCompletion = await this._openai.createChatCompletion({
+            messages: [{
+                role: "user",
+                content: `${fullText}
+
+---
+
+Explain the meaning of the highlighted phrase (${selection}) in the context of the document above.`
+            }],
+            model: "gpt-3.5-turbo",
+        });
+        return chatCompletion.data.choices[0].message?.content || "";
+    }
 }

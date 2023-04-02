@@ -1,4 +1,4 @@
-import {App, Plugin, PluginManifest, TFile} from 'obsidian';
+import {App, EditorPosition, MarkdownView, Plugin, PluginManifest, TFile} from 'obsidian';
 import {asyncDebounce, EmbeddingSearchModal} from "./embeddingSearchModal";
 import {EmbeddingHelper, NoteEmbedding} from "./embeddingHelper";
 import {EmbeddingSearchSettingTab} from "./embeddingSearchSettingTab";
@@ -72,6 +72,12 @@ export default class EmbeddingSearchPlugin extends Plugin {
             callback: () => this.embeddingSearch(),
         });
 
+        this.addCommand({
+            id: 'get-in-context',
+            name: 'Get Meaning In Context',
+            callback: () => this.getMeaningInContext(),
+        });
+
         this.addSettingTab(new EmbeddingSearchSettingTab(this.app, this));
 
         // These instanceof checks make sense.  We only want files, not folders.
@@ -101,6 +107,18 @@ export default class EmbeddingSearchPlugin extends Plugin {
                 if (pluginLoaded && file instanceof TFile) this.removeEmbedding(file);
             })
         );
+
+        this.registerEvent(this.app.workspace.on("editor-menu", (menu, editor, event) => {
+            // Check if there's a selection in the editor
+            if (editor.somethingSelected()) {
+                // Add a custom context menu item to the editor
+                menu.addItem((item) => {
+                    item.setTitle('Get Meaning In Context');
+                    item.setIcon('my-icon-class');
+                    item.onClick(() => this.getMeaningInContext());
+                });
+            }
+        }));
 
         this.app.workspace.onLayoutReady(() => {
             pluginLoaded = true;
@@ -141,5 +159,57 @@ export default class EmbeddingSearchPlugin extends Plugin {
             )
         );
         embeddingSearchModal.open();
+    }
+
+    getHighlightedText(): [string, EditorPosition?, EditorPosition?] {
+        const activeLeaf = this.app.workspace.getLeaf(false);
+
+        if (activeLeaf.view instanceof MarkdownView) {
+            const editor = activeLeaf.view.editor;
+            return [editor.getSelection(), editor.getCursor("from"), editor.getCursor("to")];
+        }
+        return ["", undefined, undefined];
+    }
+
+    getHighlightedTextInContext(): [string, string] {
+        const PREFIX = "==";
+        const POSTFIX = "==";
+
+        const activeLeaf = this.app.workspace.getLeaf(false);
+
+        if (!(activeLeaf.view instanceof MarkdownView)) {
+            return ["", ""];
+        }
+        const editor = activeLeaf.view.editor;
+        const selection = editor.getSelection()
+
+        if (selection == "") return ["", ""];
+
+        const fromPos = editor.getCursor("from");
+        const toPos = editor.getCursor("to");
+        const lines = editor.getValue().split("\n");
+
+        lines[fromPos.line] = lines[fromPos.line]
+        const insertAtIndex = (str: string, pos: number, strToInsert: string): string => str.slice(0, pos) + strToInsert + str.slice(pos);
+        lines[fromPos.line] = insertAtIndex(lines[fromPos.line], fromPos.ch, PREFIX);
+        lines[toPos.line] = insertAtIndex(lines[toPos.line], toPos.ch, POSTFIX);
+        return [`${PREFIX}${selection}${POSTFIX}`, lines.join("\n")];
+    }
+
+
+    async getMeaningInContext() {
+        const [selection, doc] = this.getHighlightedTextInContext();
+
+        const meaning = await this.embeddingsHelper.getMeaningInContext(doc, selection);
+        console.log("Meaning: " + meaning)
+
+
+        // const embeddingSearchModal = new EmbeddingSearchModal(
+        //     this.app,
+        //     this.embeddingsHelper.searchWithEmbeddings.bind(
+        //         this.embeddingsHelper, this.settings.noteEmbeddings
+        //     )
+        // );
+        // embeddingSearchModal.open();
     }
 }
